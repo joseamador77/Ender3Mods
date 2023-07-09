@@ -42,6 +42,7 @@
 #include "ES_Port.h"
 #include "terminal.h"
 #include "dbprintf.h"
+#include "EnderCommSM.h"
 
 /*----------------------------- Module Defines ----------------------------*/
 // these times assume a 10.000mS/tick timing
@@ -191,14 +192,14 @@ ES_Event_t RunTestHarnessService0(ES_Event_t ThisEvent)
   {
     case ES_INIT:
     {
-      ES_Timer_InitTimer(SERVICE0_TIMER, HALF_SEC);
+      //ES_Timer_InitTimer(SERVICE0_TIMER, HALF_SEC);
       puts("Service 00:");
       DB_printf("\rES_INIT received in Service %d\r\n", MyPriority);
     }
     break;
     case ES_TIMEOUT:   // re-start timer & announce
     {
-      ES_Timer_InitTimer(SERVICE0_TIMER, FIVE_SEC);
+      //ES_Timer_InitTimer(SERVICE0_TIMER, FIVE_SEC);
       DB_printf("ES_TIMEOUT received from Timer %d in Service %d\r\n",
           ThisEvent.EventParam, MyPriority);
     }
@@ -212,24 +213,14 @@ ES_Event_t RunTestHarnessService0(ES_Event_t ThisEvent)
     {
       DB_printf("ES_NEW_KEY received with -> %c <- in Service 0\r\n",
           (char)ThisEvent.EventParam);
-      if ('d' == ThisEvent.EventParam)
+      if ('f' == ThisEvent.EventParam)
       {
-        ThisEvent.EventParam = DeferredChar++;   //
-        if (ES_DeferEvent(DeferralQueue, ThisEvent))
-        {
-          puts("ES_NEW_KEY deferred in Service 0\r");
-        }
+          ES_Event_t fillEvt = {ES_NO_FILAMENT,0};
+          PostEnderCommSM(fillEvt);
       }
       if ('r' == ThisEvent.EventParam)
       {
-        ThisEvent.EventParam = 'Q';   // This one gets posted normally
-        PostTestHarnessService0(ThisEvent);
-        // but we slide the deferred events under it so it(they) should come out first
-        if (true == ES_RecallEvents(MyPriority, DeferralQueue))
-        {
-          puts("ES_NEW_KEY(s) recalled in Service 0\r");
-          DeferredChar = '1';
-        }
+       
       }
 #ifdef TEST_INT_POST
       if ('p' == ThisEvent.EventParam)
