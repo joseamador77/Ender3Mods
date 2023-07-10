@@ -43,6 +43,7 @@
 #include "terminal.h"
 #include "dbprintf.h"
 #include "EnderCommSM.h"
+#include "RGB_LED_Service.h"
 
 /*----------------------------- Module Defines ----------------------------*/
 // these times assume a 10.000mS/tick timing
@@ -220,7 +221,8 @@ ES_Event_t RunTestHarnessService0(ES_Event_t ThisEvent)
       }
       if ('r' == ThisEvent.EventParam)
       {
-       
+          ES_Event_t clrEvt = {ES_RED,0};
+          PostRGB_LED_Service(clrEvt);
       }
 #ifdef TEST_INT_POST
       if ('p' == ThisEvent.EventParam)

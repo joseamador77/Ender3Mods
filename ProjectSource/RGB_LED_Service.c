@@ -30,21 +30,31 @@
 
 /*----------------------------- Module Defines ----------------------------*/
 #define PBCLK_RATE 20000000L
-#define LED_PERIOD 34
+#define LED_PERIOD 33
+#define HIGH_TIME 27
+#define LOW_TIME 6
+
+#define LOWTIME 15 // number of 48MHz cycles to be low for 0.35uS
+#define HIGHTIME 65 // number of 48MHz cycles to be high for 1.65uS
+
 
 /*---------------------------- Module Functions ---------------------------*/
 /* prototypes for private functions for this service.They should be functions
    relevant to the behavior of this service
 */
 static void initLEDs(void);
+static wsColor HSBtoRGB(float hue, float sat, float brightness);
 static void ws2812b_setColor(wsColor * c, int numLEDs);
 
 /*---------------------------- Module Variables ---------------------------*/
 // with the introduction of Gen2, we need a module level Priority variable
 static uint8_t MyPriority;
 
-static wsColor colorSet[1];
-static volatile uint8_t numBitsToSend = 0;
+static wsColor colorSet[4];
+
+
+static uint32_t colorArray[5];
+static volatile uint8_t numLEDsToUpdate = 0;
 
 
 
@@ -76,9 +86,22 @@ bool InitRGB_LED_Service(uint8_t Priority)
   /********************************************
    in here you write your initialization code
    *******************************************/
+//    wsColor pink = HSBtoRGB(300,0.66,1);
+//    wsColor red = HSBtoRGB(0,1,1);
+//    wsColor orange = HSBtoRGB(26,1,1);
+//    wsColor yellow = HSBtoRGB(61,1,1);
+//    wsColor green = HSBtoRGB(112,1,1);
+//    wsColor blue = HSBtoRGB(237,1,1);
+//    wsColor purple = HSBtoRGB(270,0.82,1);
   
   initLEDs();
-  colorSet[0] = HSBtoRGB(0,1,1);
+  
+  
+//  colorArray[0] = red.r << 16 | red.g <<8 | red.b;
+//  //colorArray[1] = green.r << 16 | green.g <<8 | green.b;
+//  
+//  colorArray[0] = 0xFF0000;
+  //colorArray[1] = 0x0000FF;
   // post the initial transition event
   ThisEvent.EventType = ES_INIT;
   if (ES_PostToService(MyPriority, ThisEvent) == true)
@@ -142,7 +165,21 @@ ES_Event_t RunRGB_LED_Service(ES_Event_t ThisEvent)
         break;
         
         case ES_RED: {
-            ws2812b_setColor(colorSet,1)
+            wsColor pink = HSBtoRGB(300,0.66,1);
+            wsColor red = HSBtoRGB(0,1,1);
+            wsColor orange = HSBtoRGB(26,1,1);
+            wsColor yellow = HSBtoRGB(61,1,1);
+            wsColor green = HSBtoRGB(112,1,1);
+            wsColor blue = HSBtoRGB(237,1,1);
+            wsColor purple = HSBtoRGB(270,0.82,1);
+            colorSet[0] = red;
+            colorSet[1] = green;
+            colorSet[2] = yellow;
+            colorSet[3] = green;
+            
+            DB_printf("COLORS\r\n");
+            ws2812b_setColor(colorSet,4);
+            //LATBINV = 0b100000000000; // invert B11
         }
         break;
 
@@ -157,98 +194,198 @@ ES_Event_t RunRGB_LED_Service(ES_Event_t ThisEvent)
 static void initLEDs(void){
     // --------------- Set LED pin as digital out ------------------ 
     TRISBbits.TRISB11 = 0;       // OC output
+    
+    LATBbits.LATB11 = 0;        //set to 0
     // ----------------------------------------------------------------
     
     // ------------------------- Timer 2 ------------------------------
     T2CONbits.ON = 0;           // turn off timer 2
     T2CONbits.TCS = 0;          // PBCLK source
     T2CONbits.TCKPS = 0b000;    // pre-scale 1
+    //T2CONbits.TCKPS = 0b011;    // pre-scale 1
     TMR2 = 0;          // clear the timer register
-    PR2 = 34;           // set period to 2500 Hz
+    PR2 = 65535;           // set period to 2500 Hz
+//    T2CONbits.ON = 1;           // turn on timer 2
+    //PR2 = 10000;           // set period to 2500 Hz
     // ----------------------------------------------------------------
 
     // -------------------------- OC 2 --------------------------
-    OC2CONbits.ON = 0;          // turn off OC2
-    OC2CONbits.OCTSEL = 0;      // select timer 2
-    OC2CONbits.OCM = 0b101;     // Continuous output pulses
-    OC2CONbits.OC32 = 0;        // 16 bit mode
-    OC2R = 0;                   // Resets on 0
-    OC2RS = 7;                  // Timing one
-    RPB11R = 0b0101;             // map OC2 to RB11
+//    OC2CONbits.ON = 0;          // turn off OC2
+//    OC2CONbits.OCTSEL = 0;      // select timer 2
+//    OC2CONbits.OCM = 0b101;     // Continuous output pulses
+//    OC2CONbits.OC32 = 0;        // 16 bit mode
+//    OC2R = 0;                   // Resets on 0
+//    OC2RS = HIGH_TIME;                  // Timing one
+//    RPB11R = 0b0101;             // map OC2 to RB11
     // ----------------------------------------------------------------
 
      //--------------------------CONFIG INTERRUPTS--------------------//
-    __builtin_disable_interrupts(); // disable global interrupts
-    INTCONbits.MVEC = 1;            // enable multivector mode
+//    __builtin_disable_interrupts(); // disable global interrupts
+//    INTCONbits.MVEC = 1;            // enable multivector mode
+//    
+//    //IPC2bits.OC2IP = 6;             //OC2 priority
+//    //IPC2bits.T2IP = 6;              //T2 priority
+//    
+//    //IFS0CLR = _IFS0_OC2IF_MASK;     //clear OC flag
+//    //IFS0CLR = _IFS0_T2IF_MASK;      //clear T2 flag
+//    
+//    //IEC0SET = _IEC0_OC2IE_MASK;     //enable OC2 interrupts
+//    //IEC0SET = _IEC0_T2IE_MASK;      //enable T2 interrupts
+//    
+//    __builtin_enable_interrupts();  // enable global interrupts
     
-    IPC2bits.OC2IP = 6;             //OC2 priority
-    IPC2bits.T2IP = 5;              //T2 priority
     
-    IFS0CLR = _IFS0_OC2IF_MASK;     //clear OC flag
-    IFS0CLR = _IFS0_T2IF_MASK;      //clear T2 flag
     
-    IEC0SET = _IEC0_OC2IE_MASK;     //enable OC2 interrupts
-    IEC0SET = _IEC0_T2IE_MASK;      //enable T2 interrupts
-    
-    __builtin_enable_interrupts();  // enable global interrupts
-    
-     // Turn on OC2, and Timer 2
-   //OC2CONbits.ON = 1;          // turn on OC2
-   //T2CONbits.ON = 1;           // turn on timer 2
 }   
 
-void __ISR(_OUTPUT_COMPARE_2_VECTOR, IPL6SOFT) LEDControl(void){
-    IFS0CLR = _IFS0_OC2IF_MASK;     //clear OC flag     
-    
 
+void __ISR(_TIMER_2_VECTOR,IPL6SOFT) Timer2Rollover(void){
+    static int8_t index = 23;
+    static uint8_t currLED = 0;
     
-
-    while (numBitsToSend > 0){
-        if (colorSet[0].r >> 7 == 0){
-            OC2RS = 7;
-        }else{
-            OC2RS = 27;
+    IFS0CLR = _IFS0_T2IF_MASK; //clear interrupt flag
+     //DB_printf("INDEX %d \r\n",index);     
+    if (colorArray[currLED] & (1 << index)){ //1
+         OC2RS = HIGH_TIME;
+        // DB_printf("HIGH\r\n");
+    }else{ //0
+        OC2RS = LOW_TIME;
+        //DB_printf("LOW\r\n");
+    }
+    
+    index--;
+    if (index < 0){
+        currLED++;
+        index = 23;
+       // DB_printf("NEXT LED\r\n");
+                  
+        if (currLED >= numLEDsToUpdate){
+            T2CONbits.ON = 0;           // turn off timer 2
+            OC2CONbits.ON = 0;          // turn off OC2
+            currLED = 0;                //reset current LED
+            LATBbits.LATB11 = 0;
+            DB_printf("END\r\n");
+           
         }
-        
     }
     
 }
 
-void __ISR(_TIMER_2_VECTOR,IPL5SOFT) Timer2Rollover(void){
-    IFS0CLR = _IFS0_T2IF_MASK;
-    numBitsToSend--; //finished a bit
-}
+
+//static void ws2812b_setColor(wsColor * c, uint8_t numLEDs) {
+//    numLEDsToUpdate = numLEDs;
+//    
+//    LATBbits.LATB11 = 0;
+//    TMR2 = 0; //reset timer 2
+//    //turn on modules to update the colors
+//    DB_printf("MODULES ON\r\n");
+//    DB_printf("num = %x\r\n",colorArray[0]);
+//    DB_printf("num = %x\r\n",colorArray[1]);
+//    DB_printf("num = %x\r\n",colorArray[2]);
+//    OC2CONbits.ON = 1;          // turn on OC2
+//    T2CONbits.ON = 1;           // turn on timer 2
+//    
+//}
 
 
-static void ws2812b_setColor(wsColor * c, int numLEDs) {
-    static int i = 0; 
-    static int j = 0; // for loops
+// build an array of high/low times from the color input array, then output the high/low bits
+void ws2812b_setColor(wsColor * c, int numLEDs) {
+    int i = 0; int j = 0; // for loops
     int numBits = 2 * 3 * 8 * numLEDs; // the number of high/low bits to store, 2 per color bit
-     
-    
-    numBitsToSend = 3*8*numLEDs + 1 ;//determine bits to send
-    TMR2 = 0; //reset timer 2
-    
-    //turn on modules to update the colors
-    OC2CONbits.ON = 1;          // turn on OC2
-    T2CONbits.ON = 1;           // turn on timer 2
+    volatile unsigned int delay_times[2*3*8 * 5]; // I only gave you 5 WS2812B, adjust this if you get more somewhere
 
+    // start at time at 0
+    delay_times[0] = 0;
+    
+    int nB = 1; // which high/low bit you are storing, 2 per color bit, 24 color bits per WS2812B
 	
     // loop through each WS2812B
     for (i = 0; i < numLEDs; i++) {
         // loop through each color bit, MSB first
-  
-       
-    
-       
+        for (j = 7; j >= 0; j--) {
+            // if the bit is a 1
+            if (c[i].r >> j == 1) {/* identify the bit in c[].r, is it 1 */
+                // the high is longer
+                delay_times[nB] = delay_times[nB - 1] + HIGHTIME;
+                nB++;
+                delay_times[nB] = delay_times[nB - 1] + LOWTIME;
+                nB++;
+            } 
+            // if the bit is a 0
+            else {
+                // the low is longer
+                delay_times[nB] = delay_times[nB - 1] + LOWTIME;
+                nB++;
+                delay_times[nB] = delay_times[nB - 1] + HIGHTIME;
+                nB++;
+            }
+        }
+        for (j = 7; j >= 0; j--) {
+            // if the bit is a 1
+            if (c[i].g >> j == 1) {/* identify the bit in c[].r, is it 1 */
+                // the high is longer
+                delay_times[nB] = delay_times[nB - 1] + HIGHTIME;
+                nB++;
+                delay_times[nB] = delay_times[nB - 1] + LOWTIME;
+                nB++;
+            } 
+            // if the bit is a 0
+            else {
+                // the low is longer
+                delay_times[nB] = delay_times[nB - 1] + LOWTIME;
+                nB++;
+                delay_times[nB] = delay_times[nB - 1] + HIGHTIME;
+                nB++;
+            }
+        }
+        for (j = 7; j >= 0; j--) {
+            // if the bit is a 1
+            if (c[i].b >> j == 1) {/* identify the bit in c[].r, is it 1 */
+                // the high is longer
+                delay_times[nB] = delay_times[nB - 1] + HIGHTIME;
+                nB++;
+                delay_times[nB] = delay_times[nB - 1] + LOWTIME;
+                nB++;
+            } 
+            // if the bit is a 0
+            else {
+                // the low is longer
+                delay_times[nB] = delay_times[nB - 1] + LOWTIME;
+                nB++;
+                delay_times[nB] = delay_times[nB - 1] + HIGHTIME;
+                nB++;
+            }
+        }
+        // do it again for green
+		// do it again for blue
     }
+    
+//    DB_printf("stupid\r\n");
+//    for (i = 1; i < numBits; i++) {
+//        DB_printf("delay = %d\r\n",delay_times[i]);
+//    }
+
+    // turn on the pin for the first high/low
+    LATBbits.LATB11 = 1;
+    TMR2 = 0; // start the timer
+    T2CONbits.ON = 1;
+    for (i = 1; i < numBits; i++) {
+        while (TMR2 < delay_times[i]) {
+        }
+        //DB_printf("delay = %d\r\n",delay_times[i]);
+        LATBINV = 0b100000000000; // invert B11
+    }
+    
+    LATBbits.LATB11 = 0;
+    TMR2 = 0;
+    while(TMR2 < 2400){} // wait 50uS, reset condition
 }
 
 // adapted from https://forum.arduino.cc/index.php?topic=8498.0
 // hue is a number from 0 to 360 that describes a color on the color wheel
 // sat is the saturation level, from 0 to 1, where 1 is full color and 0 is gray
 // brightness sets the maximum brightness, from 0 to 1
-wsColor HSBtoRGB(float hue, float sat, float brightness) {
+static wsColor HSBtoRGB(float hue, float sat, float brightness) {
     float red = 0.0;
     float green = 0.0;
     float blue = 0.0;
